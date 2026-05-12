@@ -2,17 +2,29 @@
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddApi(this IServiceCollection services)
+    public static IServiceCollection AddApi(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddControllers();
 
         services
             .AddOpenApi()
             .AddMapsterConf()
-            .AddFluentValidationConf();  
-        
+            .AddFluentValidationConf()
+            .AddDbContextConf(configuration);
+
+
         services.AddScoped<IPollService, PollService>();
         
+        return services;
+    }
+
+    private static IServiceCollection AddDbContextConf(this IServiceCollection services, IConfiguration configuration)
+    {
+        var connectionString = configuration.GetConnectionString("DefaultConnection") ??
+            throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+
+        services.AddDbContext<ApplicationDbContext>(options =>
+            options.UseSqlServer(connectionString));
         return services;
     }
 
