@@ -1,10 +1,8 @@
-using SurveyBasket.Api.Services;
+using SurveyBasket.Api;
 
 var builder = WebApplication.CreateBuilder(args);
 {
-    builder.Services.AddControllers();
-    builder.Services.AddOpenApi();
-    builder.Services.AddScoped<IPollService, PollService>();
+    builder.Services.AddApi();
 }
 
 var app = builder.Build();

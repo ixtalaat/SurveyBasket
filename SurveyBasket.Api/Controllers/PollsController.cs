@@ -7,33 +7,37 @@ public class PollsController(IPollService pollsService) : ControllerBase
     private readonly IPollService _pollService = pollsService;
 
     [HttpGet]
-    public ActionResult<IEnumerable<Poll>> GetAll ()
+    public IActionResult GetAll()
     {
-        var _polls = _pollService.GetAll();
-        return Ok(_polls);
+        var polls = _pollService.GetAll();
+        var response = polls.Adapt<IEnumerable<PollResponse>>();
+        return Ok(response);
     }
 
     [HttpGet("{id}")]
-    public ActionResult<Poll> Get(int id)
+    public IActionResult Get([FromRoute] int id)
     {
         var poll = _pollService.Get(id); 
         if (poll == null)
                return NotFound();
-        
-        return Ok(poll);
+
+        var response = poll.Adapt<PollResponse>();
+
+        return Ok(response);
     }
 
     [HttpPost]
-    public ActionResult<Poll> Add(Poll request)
+    public IActionResult Add([FromBody] CreatePollRequest request)
     {
-        var createdPoll = _pollService.Add(request);
-        return CreatedAtAction(nameof(Get), new { id = createdPoll.Id }, createdPoll);
+        var createdPoll = _pollService.Add(request.Adapt<Poll>());
+        var response = createdPoll.Adapt<PollResponse>();
+        return CreatedAtAction(nameof(Get), new { id = createdPoll.Id }, response);
     }
 
     [HttpPut("{id}")]
-    public ActionResult<Poll> Update(int id, Poll request)
+    public IActionResult Update([FromRoute] int id, [FromBody] CreatePollRequest request)
     {
-        var isUpdated = _pollService.Update(id, request);
+        var isUpdated = _pollService.Update(id, request.Adapt<Poll>());
         if (!isUpdated)
             return NotFound();
         
@@ -41,7 +45,7 @@ public class PollsController(IPollService pollsService) : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    public ActionResult Delete(int id)
+    public IActionResult Delete([FromRoute] int id)
     {
         var isDeleted = _pollService.Delete(id);
         if (!isDeleted)
