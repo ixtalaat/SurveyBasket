@@ -1,6 +1,4 @@
-﻿using Mapster;
-
-namespace SurveyBasket.Api.Mappings;
+﻿namespace SurveyBasket.Api.Mappings;
 
 public class MappingConfigurations : IRegister
 {

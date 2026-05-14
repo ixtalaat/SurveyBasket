@@ -1,4 +1,7 @@
-﻿namespace SurveyBasket.Api.Controllers;
+﻿using Microsoft.AspNetCore.Authorization;
+using SurveyBasket.Api.Contracts.Polls;
+
+namespace SurveyBasket.Api.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
@@ -27,6 +30,7 @@ public class PollsController(IPollService pollsService) : ControllerBase
     }
 
     [HttpPost]
+    [Authorize]
     public async Task<IActionResult> Add([FromBody] PollRequest request, CancellationToken cancellationToken)
     {
         var createdPoll = await _pollService.AddAsync(request.Adapt<Poll>(), cancellationToken);

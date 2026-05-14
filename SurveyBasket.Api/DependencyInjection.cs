@@ -1,4 +1,9 @@
-﻿namespace SurveyBasket.Api;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+
+namespace SurveyBasket.Api;
 
 public static class DependencyInjection
 {
@@ -7,18 +12,20 @@ public static class DependencyInjection
         services.AddControllers();
 
         services
-            .AddOpenApi()
-            .AddMapsterConf()
-            .AddFluentValidationConf()
-            .AddDbContextConf(configuration);
+            .AddOpenApi() 
+            .AddMapsterConfig()
+            .AddFluentValidationConfig()
+            .AddDbContextConfig(configuration)
+            .AddAuthConfig(configuration);
 
 
         services.AddScoped<IPollService, PollService>();
-        
+        services.AddScoped<IAuthService, AuthService>();
+
         return services;
     }
 
-    private static IServiceCollection AddDbContextConf(this IServiceCollection services, IConfiguration configuration)
+    private static IServiceCollection AddDbContextConfig(this IServiceCollection services, IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("DefaultConnection") ??
             throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
@@ -28,7 +35,7 @@ public static class DependencyInjection
         return services;
     }
 
-    private static IServiceCollection AddMapsterConf(this IServiceCollection services)
+    private static IServiceCollection AddMapsterConfig(this IServiceCollection services)
     {
         var mappingConfig = TypeAdapterConfig.GlobalSettings;
         mappingConfig.Scan(Assembly.GetExecutingAssembly());
@@ -36,11 +43,50 @@ public static class DependencyInjection
         return services;
     }
 
-    private static IServiceCollection AddFluentValidationConf(this IServiceCollection services)
+    private static IServiceCollection AddFluentValidationConfig(this IServiceCollection services)
     {
         services
             .AddFluentValidationAutoValidation()
             .AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
+        return services;
+    }
+
+    private static IServiceCollection AddAuthConfig(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddIdentity<ApplicationUser, IdentityRole>()
+            .AddEntityFrameworkStores<ApplicationDbContext>();
+        
+        //services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
+        services.AddOptions<JwtOptions>()
+            .Bind(configuration.GetSection(JwtOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>();
+
+        services.AddSingleton<IJwtProvider, JwtProvider>();
+
+
+        services.AddAuthentication(options =>
+        {
+            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        })
+        .AddJwtBearer(options =>
+        {
+            options.RequireHttpsMetadata = false;
+            options.SaveToken = true;
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidIssuer = jwtOptions?.Issuer,
+                ValidAudience = jwtOptions?.Audience,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions?.Key!))
+            };
+        });
         return services;
     }
 }
