@@ -20,5 +20,7 @@ var app = builder.Build();
 
     app.MapControllers();
 
+    app.UseExceptionHandler();
+
     app.Run();
 }
