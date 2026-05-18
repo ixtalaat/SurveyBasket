@@ -9,16 +9,16 @@ public class AuthService(UserManager<ApplicationUser> userManager, IJwtProvider 
     private readonly IJwtProvider _jwtProvider = jwtProvider;
 
     private readonly int _refreshTokenExpirationDays = 14;
-    public async Task<AuthResponse?> GetTokenAsync(string email, string password, CancellationToken cancellationToken = default)
+    public async Task<Result<AuthResponse>> GetTokenAsync(string email, string password, CancellationToken cancellationToken = default)
     {
         var user = await _userManager.FindByEmailAsync(email);
         if (user is null)
-            return null;
+            return Result.Failure<AuthResponse>(UserErrors.InvalidCredentials);
 
         // check password
         var isPasswordValid = await _userManager.CheckPasswordAsync(user, password);
         if (!isPasswordValid)
-            return null;
+            return Result.Failure<AuthResponse>(UserErrors.InvalidCredentials);
 
         // generate jwt token
         var (token, expiresIn) = _jwtProvider.GenerateToken(user);
@@ -35,22 +35,22 @@ public class AuthService(UserManager<ApplicationUser> userManager, IJwtProvider 
 
         await _userManager.UpdateAsync(user);
 
-        return new AuthResponse(user.Id, user.Email, user.FirstName, user.LastName, token, expiresIn, refreshToken, refreshTokenExpiration);
+        return Result.Success(new AuthResponse(user.Id, user.Email, user.FirstName, user.LastName, token, expiresIn, refreshToken, refreshTokenExpiration));
     }
 
-    public async Task<AuthResponse?> GetRefreshTokenAsync(string token, string refreshToken, CancellationToken cancellationToken = default)
+    public async Task<Result<AuthResponse>> GetRefreshTokenAsync(string token, string refreshToken, CancellationToken cancellationToken = default)
     {
         var userId = _jwtProvider.ValidateToken(token);
         if (userId is null)
-            return null;
+            return Result.Failure<AuthResponse>(UserErrors.InvalidToken);
 
         var user = await _userManager.FindByIdAsync(userId);
         if (user is null)
-            return null;
+            return Result.Failure<AuthResponse>(UserErrors.InvalidToken);
 
         var userRefreshToken = user.RefreshTokens.SingleOrDefault(rt => rt.Token == refreshToken && rt.IsActive);
         if (userRefreshToken is null)
-            return null;
+            return Result.Failure<AuthResponse>(UserErrors.InvalidToken);
 
         userRefreshToken.RevokedOn = DateTime.UtcNow;
 
@@ -67,29 +67,31 @@ public class AuthService(UserManager<ApplicationUser> userManager, IJwtProvider 
 
         await _userManager.UpdateAsync(user);
 
-        return new AuthResponse(user.Id, user.Email, user.FirstName, user.LastName, newToken, expiresIn, newRefreshToken, refreshTokenExpiration);
+        return Result.Success(new AuthResponse(user.Id, user.Email, user.FirstName, user.LastName, newToken, expiresIn, newRefreshToken, refreshTokenExpiration));
 
     }
-    private static string GenerateRefreshToken() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
 
-    public async Task<bool> RevokeRefreshTokenAsync(string token, string refreshToken, CancellationToken cancellationToken = default)
+    public async Task<Result> RevokeRefreshTokenAsync(string token, string refreshToken, CancellationToken cancellationToken = default)
     {
         var userId = _jwtProvider.ValidateToken(token);
         if (userId is null)
-            return false;
+            return Result.Failure(UserErrors.InvalidToken);
 
         var user = await _userManager.FindByIdAsync(userId);
         if (user is null)
-            return false;
+            return Result.Failure(UserErrors.InvalidToken);
 
         var userRefreshToken = user.RefreshTokens.SingleOrDefault(rt => rt.Token == refreshToken && rt.IsActive);
         if (userRefreshToken is null)
-            return false;
+            return Result.Failure(UserErrors.InvalidToken);
 
         userRefreshToken.RevokedOn = DateTime.UtcNow;
-        
+
         await _userManager.UpdateAsync(user);
 
-        return true;
+        return Result.Success();
     }
+    private static string GenerateRefreshToken() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+
+    
 }
