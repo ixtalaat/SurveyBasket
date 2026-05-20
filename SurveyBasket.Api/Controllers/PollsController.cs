@@ -29,14 +29,23 @@ public class PollsController(IPollService pollsService) : ControllerBase
     {
         var result = await _pollService.AddAsync(request, cancellationToken);
 
-        return result.IsSuccess ? CreatedAtAction(nameof(Get), new { id = result.Value!.Id }, result.Value) : result.Error == PollErrors.DuplicatedPollTitle ? result.ToProblem(StatusCodes.Status409Conflict) : result.ToProblem(StatusCodes.Status400BadRequest);
+        if (result.IsSuccess)
+            return CreatedAtAction(nameof(Get), new { id = result.Value!.Id }, result.Value);
+
+        return result.Error.Equals(PollErrors.DuplicatedPollTitle)
+            ? result.ToProblem(StatusCodes.Status409Conflict) 
+            : result.ToProblem(StatusCodes.Status400BadRequest);
     }
 
     [HttpPut("{id}")]
     public async Task<IActionResult> Update([FromRoute] int id, [FromBody] PollRequest request, CancellationToken cancellationToken)
     {
         var result = await _pollService.UpdateAsync(id, request, cancellationToken);
-        return result.IsSuccess ? NoContent() : result.Error == PollErrors.DuplicatedPollTitle ? result.ToProblem(StatusCodes.Status409Conflict) : result.ToProblem(StatusCodes.Status404NotFound);
+
+        if (result.IsSuccess)
+            return NoContent();
+
+        return result.Error.Equals(PollErrors.DuplicatedPollTitle) ? result.ToProblem(StatusCodes.Status409Conflict) : result.ToProblem(StatusCodes.Status404NotFound);
     }
 
     [HttpDelete("{id}")]
