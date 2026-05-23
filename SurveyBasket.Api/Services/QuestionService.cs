@@ -1,10 +1,16 @@
-﻿using SurveyBasket.Api.Contracts.Answers;
+﻿using Microsoft.Extensions.Caching.Hybrid;
+using SurveyBasket.Api.Contracts.Answers;
 
 namespace SurveyBasket.Api.Services;
 
-public class QuestionService(ApplicationDbContext context) : IQuestionService
+public class QuestionService(ApplicationDbContext context, HybridCache hybridCache, ILogger<QuestionService> logger) : IQuestionService
 {
     private readonly ApplicationDbContext _context = context;
+    private readonly HybridCache _hybridCache = hybridCache;
+    private readonly ILogger<QuestionService> _logger = logger;
+
+    private const string _cachePrefix = "availableQuestions";
+
     public async Task<Result<IEnumerable<QuestionResponse>>> GetAllAsync(int pollId, CancellationToken cancellationToken = default)
     {
         var pollIsExist = _context.Polls.Any(p => p.Id == pollId);
@@ -31,21 +37,26 @@ public class QuestionService(ApplicationDbContext context) : IQuestionService
         if (!pollIsExist)
             return Result.Failure<IEnumerable<QuestionResponse>>(PollErrors.PollNotFound);
 
-        var questions = await _context.Questions
-            .Where(q => q.PollId == pollId && q.IsActive)
-            .Include(x => x.Answers)
-            .Select(q => new QuestionResponse(
-                q.Id,
-                q.Content,
-                q.Answers.Where(a => a.IsActive).Select(a => new AnswerResponse(
-                    a.Id,
-                    a.Content
-                )).ToList()
-            ))
-            .AsNoTracking()
-            .ToListAsync(cancellationToken);
+        var cacheKey = $"{_cachePrefix}-{pollId}";
 
-        return Result.Success(questions.Adapt<IEnumerable<QuestionResponse>>());
+        var questions = await _hybridCache.GetOrCreateAsync<IEnumerable<QuestionResponse>>(
+            cacheKey,
+            async entry => await _context.Questions
+                .Where(q => q.PollId == pollId && q.IsActive)
+                .Include(x => x.Answers)
+                .Select(q => new QuestionResponse(
+                    q.Id,
+                    q.Content,
+                    q.Answers.Where(a => a.IsActive).Select(a => new AnswerResponse(
+                        a.Id,
+                        a.Content
+                    )).ToList()
+                ))
+                .AsNoTracking()
+                .ToListAsync(cancellationToken)
+        );
+        
+        return Result.Success<IEnumerable<QuestionResponse>>(questions);
     }
 
 
@@ -79,7 +90,9 @@ public class QuestionService(ApplicationDbContext context) : IQuestionService
         await _context.Questions.AddAsync(question, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(question.Adapt<QuestionResponse>());
+        await _hybridCache.RemoveAsync($"{_cachePrefix}-{pollId}", cancellationToken);
+
+        return Result.Success<QuestionResponse>(question.Adapt<QuestionResponse>());
     }
 
     public async Task<Result> UpdateAsync(int pollId, int id, QuestionRequest request, CancellationToken cancellationToken = default)
@@ -113,6 +126,9 @@ public class QuestionService(ApplicationDbContext context) : IQuestionService
         });
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        await _hybridCache.RemoveAsync($"{_cachePrefix}-{pollId}", cancellationToken);
+
         return Result.Success();
     }
     public async Task<Result> ToggleStatusAsync(int pollId, int id, CancellationToken cancellationToken = default)
@@ -124,6 +140,9 @@ public class QuestionService(ApplicationDbContext context) : IQuestionService
         question.IsActive = !question.IsActive;
         
         await _context.SaveChangesAsync(cancellationToken);
+
+        await _hybridCache.RemoveAsync($"{_cachePrefix}-{pollId}", cancellationToken);
+
         return Result.Success();
     }
 }
