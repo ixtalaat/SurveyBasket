@@ -1,4 +1,6 @@
-﻿namespace SurveyBasket.Api.Contracts.Auth;
+﻿using SurveyBasket.Api.Abstractions.Consts;
+
+namespace SurveyBasket.Api.Contracts.Auth;
 
 public class RegisterRequestValidator : AbstractValidator<RegisterRequest>
 {
@@ -6,10 +8,10 @@ public class RegisterRequestValidator : AbstractValidator<RegisterRequest>
     {
         RuleFor(x => x.FirstName)
             .NotEmpty()
-            .MaximumLength(50);
+            .Length(3, 100);
         RuleFor(x => x.LastName)
             .NotEmpty()
-            .MaximumLength(50);
+            .Length(3, 100);
 
         RuleFor(x => x.Email)
             .NotEmpty()
@@ -17,12 +19,8 @@ public class RegisterRequestValidator : AbstractValidator<RegisterRequest>
 
         RuleFor(x => x.Password)
             .NotEmpty()
-            .MinimumLength(8);
-
-        RuleFor(x => x.ConfirmPassword)
-            .NotEmpty()
-            .Equal(x => x.Password)
-            .WithMessage("Passwords do not match.");
+            .Matches(RegexPatterns.Password)
+            .WithMessage("Password must contain at least 8 characters and should contain uppercase letter,  lowercase letter, digit, and special character.");
     }
 }
 

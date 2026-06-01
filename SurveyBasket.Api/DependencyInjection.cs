@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.IdentityModel.Tokens;
+using SurveyBasket.Api.Settings;
 using System.Text;
 
 namespace SurveyBasket.Api;
@@ -30,14 +32,19 @@ public static class DependencyInjection
             .AddAuthConfig(configuration);
 
 
-        services.AddScoped<IPollService, PollService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IEmailSender, EmailService>();
+        services.AddScoped<IPollService, PollService>();
         services.AddScoped<IQuestionService, QuestionService>();
         services.AddScoped<IVoteService, VoteService>();
         services.AddScoped<IResultService, ResultService>();
 
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddProblemDetails();
+
+        services.AddHttpContextAccessor();
+
+        services.Configure<MailSettings>(configuration.GetSection(nameof(MailSettings)));
 
         return services;
     }
@@ -71,7 +78,8 @@ public static class DependencyInjection
     private static IServiceCollection AddAuthConfig(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddIdentity<ApplicationUser, IdentityRole>()
-            .AddEntityFrameworkStores<ApplicationDbContext>();
+            .AddEntityFrameworkStores<ApplicationDbContext>()
+            .AddDefaultTokenProviders();
         
         //services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.AddOptions<JwtOptions>()
@@ -104,6 +112,19 @@ public static class DependencyInjection
                 IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions?.Key!))
             };
         });
+
+        services.Configure<IdentityOptions>(options =>
+        {
+            // Password settings.
+            options.Password.RequiredLength = 8;
+
+            // SignIn settings.
+            options.SignIn.RequireConfirmedEmail = true;
+
+            // User settings.
+            options.User.RequireUniqueEmail = true;
+        });
+
         return services;
     }
 }
