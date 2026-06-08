@@ -1,10 +1,10 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using Hangfire;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.WebUtilities;
 using SurveyBasket.Api.Helpers;
 using System.Security.Cryptography;
 using System.Text;
-using static Org.BouncyCastle.Crypto.Engines.SM2Engine;
 
 namespace SurveyBasket.Api.Services;
 
@@ -192,7 +192,9 @@ public class AuthService(
                     { "{{action_url}}", $"{origin}/auth/confirm-email?userId={user.Id}&code={code}" }
             });
 
-        await _emailSender.SendEmailAsync(user.Email!, "✔ Survey Basket: Confirm your email", emailBody);
+        BackgroundJob.Enqueue(() => _emailSender.SendEmailAsync(user.Email!, "✅ Survey Basket: Confirm your email", emailBody));
+
+        await Task.CompletedTask;
     }
 
 }

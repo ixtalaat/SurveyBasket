@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using Hangfire;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.IdentityModel.Tokens;
@@ -29,11 +30,13 @@ public static class DependencyInjection
             .AddMapsterConfig()
             .AddFluentValidationConfig()
             .AddDbContextConfig(configuration)
-            .AddAuthConfig(configuration);
+            .AddAuthConfig(configuration)
+            .AddBackgroundJobsConfig(configuration);
 
 
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IEmailSender, EmailService>();
+        services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IPollService, PollService>();
         services.AddScoped<IQuestionService, QuestionService>();
         services.AddScoped<IVoteService, VoteService>();
@@ -45,6 +48,19 @@ public static class DependencyInjection
         services.AddHttpContextAccessor();
 
         services.Configure<MailSettings>(configuration.GetSection(nameof(MailSettings)));
+
+        return services;
+    }
+
+    private static IServiceCollection AddBackgroundJobsConfig(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddHangfire(config => config
+            .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+            .UseSimpleAssemblyNameTypeSerializer()
+            .UseRecommendedSerializerSettings()
+            .UseSqlServerStorage(configuration.GetConnectionString("HangfireConnection")));
+
+        services.AddHangfireServer();
 
         return services;
     }
